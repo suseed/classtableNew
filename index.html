@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>교육 과정 관리 툴</title>
-  <!-- Tailwind CDN for quick styling -->
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background:#f5f7fa; }
@@ -18,8 +18,9 @@
 </head>
 <body class="p-6">
   <h1 class="text-2xl font-bold mb-4">교육 과정 관리</h1>
+
   <!-- ───── 입력 폼 ───── -->
-  <form id="course-form" class="grid md:grid-cols-6 gap-4 bg-white p-4 rounded shadow mb-6">
+  <form id="course-form" class="grid md:grid-cols-7 gap-4 bg-white p-4 rounded shadow mb-6">
     <div class="md:col-span-1">
       <label class="block text-sm font-medium">분류</label>
       <input id="category" type="text" required class="w-full border p-1 rounded" placeholder="환경디자인" />
@@ -27,7 +28,7 @@
 
     <div class="md:col-span-2">
       <label class="block text-sm font-medium">과정명</label>
-      <input id="title" type="text" required class="w-full border p-1 rounded" placeholder="(제품디자인)3D제품디자인기반…" />
+      <input id="title" type="text" required class="w-full border p-1 rounded" placeholder="(제품디자인)3D제품디자인…" />
     </div>
 
     <div class="md:col-span-2 flex gap-2">
@@ -39,6 +40,11 @@
         <label class="block text-sm font-medium">종료일</label>
         <input id="end-date" type="date" required class="w-full border p-1 rounded" />
       </div>
+    </div>
+
+    <div class="md:col-span-1">
+      <label class="block text-sm font-medium">이미지</label>
+      <input id="image-file" type="file" accept="image/*" class="w-full border p-1 rounded text-sm" />
     </div>
 
     <div class="md:col-span-1 flex items-end">
@@ -61,9 +67,11 @@
     <table id="course-table" class="min-w-full text-sm">
       <thead class="bg-sky-900 text-white">
         <tr>
+          <th class="px-3 py-2 text-left">이미지</th>
           <th class="px-3 py-2 text-left">교육과정분류</th>
           <th class="px-3 py-2 text-left">과정명</th>
           <th class="px-3 py-2 text-left">교육기간</th>
+          <th class="px-3 py-2 text-center w-24">신청</th>
           <th class="px-3 py-2 text-center w-16">삭제</th>
         </tr>
       </thead>
@@ -72,49 +80,62 @@
   </div>
 
 <script>
-// ───── 헬퍼 ─────
-const tbody          = document.getElementById('tbody');
-const STORAGE_KEY    = 'courses';
+// ───── 상수 ─────
+const tbody       = document.getElementById('tbody');
+const STORAGE_KEY = 'courses';
 
+// ───── 유틸 ─────
 const loadCourses = () => JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 const saveCourses = (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-
-const formatDate = (v) => v ? v.replaceAll('-', '.') : '';
+const formatDate  = (v) => v ? v.replaceAll('-', '.') : '';
 
 // ───── 행 추가 ─────
 function addCourse(e){
   e.preventDefault();
-  const cat  = document.getElementById('category').value.trim();
-  const title= document.getElementById('title').value.trim();
-  const sd   = document.getElementById('start-date').value;
-  const ed   = document.getElementById('end-date').value;
-  if(!cat||!title||!sd||!ed) return alert('모든 필드를 채워주세요');
+  const cat   = document.getElementById('category').value.trim();
+  const title = document.getElementById('title').value.trim();
+  const sd    = document.getElementById('start-date').value;
+  const ed    = document.getElementById('end-date').value;
+  const file  = document.getElementById('image-file').files[0] || null;
+  if(!cat || !title || !sd || !ed) return alert('모든 필드를 채워주세요');
 
-  const course = {
-    id: Date.now(),
-    category: cat,
-    title: title,
-    startDate: sd,
-    endDate: ed
+  const proceed = (imgData)=>{
+    const course = {
+      id: Date.now(),
+      category: cat,
+      title: title,
+      startDate: sd,
+      endDate: ed,
+      image: imgData // base64 또는 null
+    };
+    const data = loadCourses();
+    data.push(course);
+    saveCourses(data);
+    render();
+    document.getElementById('course-form').reset();
   };
-  const data = loadCourses();
-  data.push(course);
-  saveCourses(data);
-  render();
-  document.getElementById('course-form').reset();
+
+  if(file){
+    const reader = new FileReader();
+    reader.onload = (evt)=> proceed(evt.target.result);
+    reader.readAsDataURL(file);
+  } else {
+    proceed(null);
+  }
 }
 
-// ───── 행 렌더링 ─────
+// ───── 테이블 렌더 ─────
 function render(){
-  tbody.innerHTML='';
-  const data = loadCourses();
-  data.forEach((c,idx)=>{
+  tbody.innerHTML = '';
+  loadCourses().forEach((c, idx) => {
     const tr = document.createElement('tr');
-    if(idx%2) tr.classList.add('alt-row');
+    if(idx % 2) tr.classList.add('alt-row');
     tr.innerHTML = `
+      <td class="px-3 py-2"><img src="${c.image || ''}" alt="thumb" class="w-20 h-12 object-cover rounded" onerror="this.style.display='none'" /></td>
       <td class="px-3 py-2 whitespace-nowrap">${c.category}</td>
       <td class="px-3 py-2">${c.title}</td>
       <td class="px-3 py-2">${formatDate(c.startDate)} ~ ${formatDate(c.endDate)}</td>
+      <td class="px-3 py-2 text-center"><button onclick="applyCourse(${c.id})" class="bg-sky-700 hover:bg-sky-800 text-white px-2 py-1 rounded text-xs">신청</button></td>
       <td class="px-3 py-2 text-center"><button onclick="removeCourse(${c.id})" class="text-red-600">🗑️</button></td>
     `;
     tbody.appendChild(tr);
@@ -122,40 +143,46 @@ function render(){
 }
 
 function removeCourse(id){
-  const data = loadCourses().filter(c=>c.id!==id);
+  const data = loadCourses().filter(c => c.id !== id);
   saveCourses(data);
   render();
 }
 
-// ───── JSON I/O ─────
-function exportJSON(){
-  const blob = new Blob([JSON.stringify(loadCourses(),null,2)], {type:'application/json'});
-  downloadBlob(blob, 'courses.json');
+function applyCourse(id){
+  const course = loadCourses().find(c=>c.id===id);
+  if(!course) return;
+  alert(`『${course.title}』 과정 신청 완료!`);
 }
 
+// ───── JSON I/O ─────
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(loadCourses(), null, 2)], {type:'application/json'});
+  downloadBlob(blob, 'courses.json');
+}
 function importJSON(){ document.getElementById('import-json-input').click(); }
 
-document.getElementById('import-json-input').addEventListener('change',e=>{
-  const file=e.target.files[0]; if(!file) return;
+document.getElementById('import-json-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
   const reader = new FileReader();
-  reader.onload = ()=>{ try{ saveCourses(JSON.parse(reader.result)); render(); }catch(err){ alert('잘못된 JSON 파일입니다'); } };
+  reader.onload = () => { try{ saveCourses(JSON.parse(reader.result)); render(); } catch(err){ alert('잘못된 JSON 파일입니다'); } };
   reader.readAsText(file);
 });
 
 // ───── CSV ─────
 function exportCSV(){
-  const rows = [['교육과정분류','과정명','시작일','종료일']];
-  loadCourses().forEach(c=> rows.push([c.category,c.title,formatDate(c.startDate),formatDate(c.endDate)]));
-  const csv = rows.map(r=> r.map(v=> `"${v.replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  downloadBlob(blob,'courses.csv');
+  const rows = [['이미지(DataURL)','교육과정분류','과정명','시작일','종료일']];
+  loadCourses().forEach(c => rows.push([c.image || '', c.category, c.title, formatDate(c.startDate), formatDate(c.endDate)]));
+  const csv = rows.map(r => r.map(v => `"${(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  downloadBlob(blob, 'courses.csv');
 }
 
 // ───── 공통 다운로드 ─────
-function downloadBlob(blob,filename){
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download=filename; a.click();
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -164,14 +191,14 @@ function printTable(){ window.print(); }
 function clearAll(){ if(confirm('모든 데이터를 삭제하시겠습니까?')){ saveCourses([]); render(); } }
 
 // ───── 이벤트 바인딩 ─────
-document.getElementById('course-form').addEventListener('submit',addCourse);
-document.getElementById('export-json').addEventListener('click',exportJSON);
-document.getElementById('import-json').addEventListener('click',importJSON);
-document.getElementById('export-csv').addEventListener('click',exportCSV);
-document.getElementById('print-btn').addEventListener('click',printTable);
-document.getElementById('clear-btn').addEventListener('click',clearAll);
+document.getElementById('course-form').addEventListener('submit', addCourse);
+document.getElementById('export-json').addEventListener('click', exportJSON);
+document.getElementById('import-json').addEventListener('click', importJSON);
+document.getElementById('export-csv').addEventListener('click', exportCSV);
+document.getElementById('print-btn').addEventListener('click', printTable);
+document.getElementById('clear-btn').addEventListener('click', clearAll);
 
-// ───── 초기 그리기 ─────
+// ───── 초기 렌더 ─────
 render();
 </script>
 </body>
